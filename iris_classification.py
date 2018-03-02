@@ -15,24 +15,38 @@ def map_varities(species, mapping_dict):
 	species = mapping_dict[species]
 	return species
 
-def visualize_data(train):
-	# print train.describe(include='all')
-	sns.barplot(x="SepalLengthCm", y="Species", data=train)
-	#graph shows sepallength is a good parameter
-	sns.barplot(x="SepalWidthCm", y="Species", data=train)
-	# graph shows sepalwidth is a good parameter
-	sns.barplot(x="PetalLengthCm", y="Species", data=train)
-	# graph shows petallength is a good parameter
-	sns.barplot(x="PetalWidthCm", y="Species", data=train)
-	# graph shows petalwidth is a good parameter
-	# plt.show()
+def save_dataframe_to_csv(dataframe, csv_file):
+	dataframe.to_csv(csv_file, index=False)
+
+def visualize_data(df):
+	# print list(df['currency'].unique())
+	df =  df[['deadline']]
+	save_dataframe_to_csv(df, 'output.csv')	
+	# print df.describe()
+
+def convert_currency_to_us(ele):
+	currency_conversion = {'USD' : 1.0, 'GBP' : 0.73, 'CAD' : 1.29, 
+		'AUD' : 1.29, 'NZD' : 1.38, 'EUR' : 0.81, 'SEK' : 8.26, 'NOK' : 7.83, 'DKK' : 6.05}
+	return currency_conversion[ele]
 
 def preprocess_data(dataset):
-	Iris_varieties_mapping = {'Iris-setosa' : 0  , 'Iris-versicolor' : 1 , 
-	'Iris-virginica' : 2}
-	dataset["Species"] = dataset["Species"].apply(map_varities, 
-	args = (Iris_varieties_mapping,))
-	return dataset
+	# convert all goal prices to USD for comparision
+	dataset['currency'] = dataset['currency'].apply(convert_currency_to_us)
+	dataset['price'] = dataset['goal'] * dataset['currency']
+	
+	#get the difference between important dates
+	dataset['dead_create'] = dataset['deadline'] - dataset['created_at']
+	dataset['dead_launch'] = dataset['deadline'] - dataset['launched_at']
+	dataset['launch_create'] = dataset['launched_at'] - dataset['created_at']
+
+	# remove unnecessary features
+	columns = list(dataset.columns)
+	remove_columns = ['project_id', 'name', 'desc', 'state_changed_at', 'currency', 'goal', 
+		'created_at', 'launched_at', 'deadline']
+	columns = [col for col in columns if col not in remove_columns]
+	print columns
+	# dataset = dataset[columns]
+	return dataset	
 
 def train_data(dataset):
 	y = dataset["final_status"]
@@ -40,8 +54,8 @@ def train_data(dataset):
 	X = X.apply(preprocessing.LabelEncoder().fit_transform)
 	X = StandardScaler().fit_transform(X)
 	# print X.head()
-	X_train , X_test, y_train , y_test = train_test_split(X, y)
-	rcf = RandomForestClassifier().fit(X_train, y_train)
+	X_train , X_test, y_train , y_test = train_test_split(X, y, random_state=0)
+	rcf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
 	return rcf, X_train, X_test, y_train, y_test
 
 def calculate_accuracy(predicted, true):
@@ -54,8 +68,9 @@ def predict_test(classifier, X_test):
 
 if __name__ == '__main__':
 	dataset = pd.read_csv('train.csv')
-	print dataset.head()
-	# visualize_data(dataset)
+	visualize_data(dataset)
+	dataset = preprocess_data(dataset)
+	# print dataset.head()
 	# dataset = preprocess_data(dataset)
 	classifier, X_train, X_test, y_train, y_test = train_data(dataset)
 	X_test_predict = predict_test(classifier, X_test)
