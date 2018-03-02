@@ -40,9 +40,9 @@ def train_data(dataset):
 	X = X.apply(preprocessing.LabelEncoder().fit_transform)
 	X = StandardScaler().fit_transform(X)
 	# print X.head()
-	# X_train , X_test, y_train , y_test = train_test_split(X, y)
-	rcf = RandomForestClassifier().fit(X, y)
-	return rcf
+	X_train , X_test, y_train , y_test = train_test_split(X, y)
+	rcf = RandomForestClassifier().fit(X_train, y_train)
+	return rcf, X_train, X_test, y_train, y_test
 
 def calculate_accuracy(predicted, true):
 	accuracy = accuracy_score(true, predicted)
@@ -57,8 +57,7 @@ if __name__ == '__main__':
 	print dataset.head()
 	# visualize_data(dataset)
 	# dataset = preprocess_data(dataset)
-	classifier = train_data(dataset)
-	# X_test_predict = predict_test(classifier, X_test)
-	# test_accuracy = calculate_accuracy(X_test_predict, y_test)
-	# print test_accuracy
-	print classifier
+	classifier, X_train, X_test, y_train, y_test = train_data(dataset)
+	X_test_predict = predict_test(classifier, X_test)
+	test_accuracy = calculate_accuracy(X_test_predict, y_test)
+	print test_accuracy
