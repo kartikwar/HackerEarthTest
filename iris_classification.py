@@ -8,6 +8,8 @@ from sklearn.model_selection import train_test_split
 warnings.filterwarnings('ignore')
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn import preprocessing
 
 def map_varities(species, mapping_dict):
 	species = mapping_dict[species]
@@ -33,11 +35,14 @@ def preprocess_data(dataset):
 	return dataset
 
 def train_data(dataset):
-	y = dataset["Species"]
-	X = dataset.drop('Species', axis=1)
-	X_train , X_test, y_train , y_test = train_test_split(X, y)
-	rcf = RandomForestClassifier().fit(X_train, y_train)
-	return rcf, X_train, X_test, y_train, y_test
+	y = dataset["final_status"]
+	X = dataset.drop('final_status', axis=1)
+	X = X.apply(preprocessing.LabelEncoder().fit_transform)
+	X = StandardScaler().fit_transform(X)
+	# print X.head()
+	# X_train , X_test, y_train , y_test = train_test_split(X, y)
+	rcf = RandomForestClassifier().fit(X, y)
+	return rcf
 
 def calculate_accuracy(predicted, true):
 	accuracy = accuracy_score(true, predicted)
@@ -48,10 +53,12 @@ def predict_test(classifier, X_test):
 	return X_test_predict 		
 
 if __name__ == '__main__':
-	dataset = pd.read_csv('Iris.csv')
-	visualize_data(dataset)
-	dataset = preprocess_data(dataset)
-	classifier, X_train, X_test, y_train, y_test = train_data(dataset)
-	X_test_predict = predict_test(classifier, X_test)
-	test_accuracy = calculate_accuracy(X_test_predict, y_test)
-	print test_accuracy
+	dataset = pd.read_csv('train.csv')
+	print dataset.head()
+	# visualize_data(dataset)
+	# dataset = preprocess_data(dataset)
+	classifier = train_data(dataset)
+	# X_test_predict = predict_test(classifier, X_test)
+	# test_accuracy = calculate_accuracy(X_test_predict, y_test)
+	# print test_accuracy
+	print classifier
