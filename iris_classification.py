@@ -10,25 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
-<<<<<<< HEAD
-from sklearn.model_selection import GridSearchCV
-from sklearn.cross_validation import KFold
-import multiprocessing
-from functools import partial
-from contextlib import contextmanager
-import xgboost as xgb
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, ExtraTreesClassifier
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
 
-
-@contextmanager
-def poolcontext(*args, **kwargs):
-    pool = multiprocessing.Pool(*args, **kwargs)
-    yield pool
-    pool.terminate()
-=======
->>>>>>> parent of cd79419... random forest classifier
 
 def map_varities(species, mapping_dict):
 	species = mapping_dict[species]
