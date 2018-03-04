@@ -142,8 +142,8 @@ if __name__ == '__main__':
 	# print dataset.head()
 	# dataset = preprocess_data(dataset)
 	classifier, X_train, X_test, y_train, y_test = first_level_training(dataset)
-	clf = second_level_training(X_train, y_train)
-	predictions = clf.predict(X_test)
+	# clf = second_level_training(X_train, y_train)
+	predictions = classifier.predict(X_test)
 	print 'predictions are ', predictions
 	# X_test_predict = predict_test(classifier, X_test)
 	test_accuracy = calculate_accuracy(predictions, y_test)
