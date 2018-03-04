@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
+<<<<<<< HEAD
 from sklearn.model_selection import GridSearchCV
 from sklearn.cross_validation import KFold
 import multiprocessing
@@ -26,6 +27,8 @@ def poolcontext(*args, **kwargs):
     pool = multiprocessing.Pool(*args, **kwargs)
     yield pool
     pool.terminate()
+=======
+>>>>>>> parent of cd79419... random forest classifier
 
 def map_varities(species, mapping_dict):
 	species = mapping_dict[species]
@@ -33,15 +36,6 @@ def map_varities(species, mapping_dict):
 
 def save_dataframe_to_csv(dataframe, csv_file):
 	dataframe.to_csv(csv_file)
-
-def determine_best_params_random_forest(X_train, y_train):
-	grid_values = {'n_estimators' : [125, 625]}
-	clf = RandomForestClassifier(random_state = 0)
-	grid_clf_accuracy = GridSearchCV(clf, param_grid=grid_values, 
-		n_jobs=-1, scoring='accuracy')
-	grid_clf_accuracy.fit(X_train, y_train)
-	best_params =grid_clf_accuracy.best_params_
-	return best_params
 
 def visualize_data(df):
 	# print list(df['currency'].unique())
@@ -130,9 +124,9 @@ def get_oof(clf, x_train, y_train, x_test):
 def first_level_training(dataset):
 	#visualize coorelation after preprocessing
 	dataset = dataset.apply(preprocessing.LabelEncoder().fit_transform)
-	# corr = dataset.corr(method='pearson')
-	# corr = corr[['final_status']]
-	# save_dataframe_to_csv(corr, 'output2.csv')
+	corr = dataset.corr(method='pearson')
+	corr = corr[['final_status']]
+	save_dataframe_to_csv(corr, 'output2.csv')
 
 	y = dataset["final_status"]
 	X = dataset.drop('final_status', axis=1)
@@ -141,36 +135,9 @@ def first_level_training(dataset):
 
 	# print X.head()
 	X_train , X_test, y_train , y_test = train_test_split(X, y, random_state=0)
-	X_train = pd.DataFrame(X_train)
-	X_test = pd.DataFrame(X_test)
-	y_train = pd.DataFrame(y_train)
-	y_test = pd.DataFrame(y_test)
-	
 
-	#determine best params for random forest
-	# best_params = determine_best_params_random_forest(X_train, y_train)
-	# print 'best params for random forest are ', best_params
-
-	rcf = RandomForestClassifier(warm_start=True,  n_jobs=-1 , verbose=0,
-		min_samples_leaf=2, n_estimators=500, max_features='sqrt',
-		max_depth=6, random_state = 0)
-	rf_predict_train, rf_predict_test = get_oof(rcf, X_train, y_train, X_test)
-
-	et = ExtraTreesClassifier(n_estimators=500,  n_jobs=-1 , verbose=0,
-		min_samples_leaf=2, max_depth=8, random_state=0)
-	et_predict_train, et_predict_test = get_oof(et, X_train, y_train, X_test)
-
-	svc = SVC(kernel='linear', C=0.025, random_state=0)
-	svc_predict_train, svc_predict_test = get_oof(svc, X_train, y_train, X_test)
-
-	knn = KNeighborsClassifier(n_neighbors=1)
-	knn_predict_train, knn_predict_test = get_oof(knn, X_train, y_train, X_test)
-
-	X_train = np.concatenate(( rf_predict_train, et_predict_train, svc_predict_train), axis=1)
-	X_predict_test = np.concatenate(( rf_predict_test, et_predict_test, svc_predict_test), axis=1)
-
-
-	return rcf, X_train, X_predict_test, y_train, y_test
+	rcf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
+	return rcf, X_train, X_test, y_train, y_test
 
 def calculate_accuracy(predicted, true):
 	accuracy = accuracy_score(true, predicted)
