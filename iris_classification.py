@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
+from sklearn.model_selection import GridSearchCV
 
 def map_varities(species, mapping_dict):
 	species = mapping_dict[species]
@@ -17,6 +18,15 @@ def map_varities(species, mapping_dict):
 
 def save_dataframe_to_csv(dataframe, csv_file):
 	dataframe.to_csv(csv_file)
+
+def determine_best_params_random_forest(X_train, y_train):
+	grid_values = {'n_estimators' : [125, 625]}
+	clf = RandomForestClassifier(random_state = 0)
+	grid_clf_accuracy = GridSearchCV(clf, param_grid=grid_values, 
+		n_jobs=-1, scoring='accuracy')
+	grid_clf_accuracy.fit(X_train, y_train)
+	best_params =grid_clf_accuracy.best_params_
+	return best_params
 
 def visualize_data(df):
 	# print list(df['currency'].unique())
@@ -70,9 +80,9 @@ def preprocess_data(dataset):
 def train_data(dataset):
 	#visualize coorelation after preprocessing
 	dataset = dataset.apply(preprocessing.LabelEncoder().fit_transform)
-	corr = dataset.corr(method='pearson')
-	corr = corr[['final_status']]
-	save_dataframe_to_csv(corr, 'output2.csv')
+	# corr = dataset.corr(method='pearson')
+	# corr = corr[['final_status']]
+	# save_dataframe_to_csv(corr, 'output2.csv')
 
 	y = dataset["final_status"]
 	X = dataset.drop('final_status', axis=1)
@@ -81,7 +91,15 @@ def train_data(dataset):
 
 	# print X.head()
 	X_train , X_test, y_train , y_test = train_test_split(X, y, random_state=0)
-	rcf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
+
+	#determine best params for random forest
+	# best_params = determine_best_params_random_forest(X_train, y_train)
+	# print 'best params for random forest are ', best_params
+
+	rcf = RandomForestClassifier(warm_start=True,  n_jobs=-1 , verbose=0,
+		min_samples_leaf=2, n_estimators=500, max_features='sqrt',
+		max_depth=6, random_state = 0).fit(X_train, y_train)
+
 	return rcf, X_train, X_test, y_train, y_test
 
 def calculate_accuracy(predicted, true):
