@@ -11,6 +11,21 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
 from sklearn.model_selection import GridSearchCV
+from sklearn.cross_validation import KFold
+import multiprocessing
+from functools import partial
+from contextlib import contextmanager
+import xgboost as xgb
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, ExtraTreesClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+
+
+@contextmanager
+def poolcontext(*args, **kwargs):
+    pool = multiprocessing.Pool(*args, **kwargs)
+    yield pool
+    pool.terminate()
 
 def map_varities(species, mapping_dict):
 	species = mapping_dict[species]
@@ -77,7 +92,42 @@ def preprocess_data(dataset):
 	dataset = dataset[columns]
 	return dataset	
 
-def train_data(dataset):
+def train_model_in_folds(counter_kf_ele, x_train, y_train, x_test, oof_train, oof_test_skf, clf):
+
+	x_tr = x_train.iloc[counter_kf_ele['indexes'][0]]
+	y_tr = y_train.iloc[counter_kf_ele['indexes'][0]]
+	x_te = x_train.iloc[counter_kf_ele['indexes'][1]]
+	clf.fit(x_tr, y_tr)
+	oof_train[counter_kf_ele['indexes'][1]] = clf.predict(x_te)
+	oof_test_skf[counter_kf_ele['counter'], :] = clf.predict(x_test)
+
+def get_oof(clf, x_train, y_train, x_test):
+	# print (type(x_train))
+	ntrain = x_train.shape[0]
+	# print ntrain
+	ntest = x_test.shape[0]
+	oof_train = np.zeros((ntrain,))
+	oof_test = np.zeros((ntest,))
+	SEED = 0 # for reproducibility
+	NFOLDS = 5 # set folds for out-of-fold prediction
+	kf = KFold(len(x_train), n_folds= NFOLDS, random_state=SEED)
+	kf = list(kf)
+	oof_test_skf = np.empty((NFOLDS, ntest))
+	
+	counter = 0
+	counter_kf_list = []
+	for ele in kf:
+		counter_kf = {'counter' : counter, 'indexes' : ele}
+		counter_kf_list.append(counter_kf)
+
+	with poolcontext(processes=3) as pool:
+		results = pool.map(partial(train_model_in_folds, 
+			x_train=x_train, y_train=y_train, oof_train=oof_train, oof_test_skf=oof_test_skf, clf=clf, x_test=x_test), counter_kf_list)
+		# print (oof_test_skf)
+		oof_test[:] = oof_test_skf.mean(axis=0)	
+		return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1)
+
+def first_level_training(dataset):
 	#visualize coorelation after preprocessing
 	dataset = dataset.apply(preprocessing.LabelEncoder().fit_transform)
 	# corr = dataset.corr(method='pearson')
@@ -91,6 +141,11 @@ def train_data(dataset):
 
 	# print X.head()
 	X_train , X_test, y_train , y_test = train_test_split(X, y, random_state=0)
+	X_train = pd.DataFrame(X_train)
+	X_test = pd.DataFrame(X_test)
+	y_train = pd.DataFrame(y_train)
+	y_test = pd.DataFrame(y_test)
+	
 
 	#determine best params for random forest
 	# best_params = determine_best_params_random_forest(X_train, y_train)
@@ -98,9 +153,24 @@ def train_data(dataset):
 
 	rcf = RandomForestClassifier(warm_start=True,  n_jobs=-1 , verbose=0,
 		min_samples_leaf=2, n_estimators=500, max_features='sqrt',
-		max_depth=6, random_state = 0).fit(X_train, y_train)
+		max_depth=6, random_state = 0)
+	rf_predict_train, rf_predict_test = get_oof(rcf, X_train, y_train, X_test)
 
-	return rcf, X_train, X_test, y_train, y_test
+	et = ExtraTreesClassifier(n_estimators=500,  n_jobs=-1 , verbose=0,
+		min_samples_leaf=2, max_depth=8, random_state=0)
+	et_predict_train, et_predict_test = get_oof(et, X_train, y_train, X_test)
+
+	svc = SVC(kernel='linear', C=0.025, random_state=0)
+	svc_predict_train, svc_predict_test = get_oof(svc, X_train, y_train, X_test)
+
+	knn = KNeighborsClassifier(n_neighbors=1)
+	knn_predict_train, knn_predict_test = get_oof(knn, X_train, y_train, X_test)
+
+	X_train = np.concatenate(( rf_predict_train, et_predict_train, svc_predict_train), axis=1)
+	X_predict_test = np.concatenate(( rf_predict_test, et_predict_test, svc_predict_test), axis=1)
+
+
+	return rcf, X_train, X_predict_test, y_train, y_test
 
 def calculate_accuracy(predicted, true):
 	accuracy = accuracy_score(true, predicted)
@@ -110,13 +180,22 @@ def predict_test(classifier, X_test):
 	X_test_predict = classifier.predict(X_test)
 	return X_test_predict 		
 
+def second_level_training(X_train, y_train):
+	gbm = xgb.XGBClassifier(n_estimators= 2000,max_depth= 4,min_child_weight= 2,
+		gamma=0.9,subsample=0.8, objective='binary:logistic', 
+		nthread= -1,scale_pos_weight=1).fit(X_train, y_train)
+	return gbm
+
 if __name__ == '__main__':
 	dataset = pd.read_csv('train.csv')
 	visualize_data(dataset)
 	dataset = preprocess_data(dataset)
 	# print dataset.head()
 	# dataset = preprocess_data(dataset)
-	classifier, X_train, X_test, y_train, y_test = train_data(dataset)
-	X_test_predict = predict_test(classifier, X_test)
-	test_accuracy = calculate_accuracy(X_test_predict, y_test)
+	classifier, X_train, X_test, y_train, y_test = first_level_training(dataset)
+	clf = second_level_training(X_train, y_train)
+	predictions = clf.predict(X_test)
+	print 'predictions are ', predictions
+	# X_test_predict = predict_test(classifier, X_test)
+	test_accuracy = calculate_accuracy(predictions, y_test)
 	print test_accuracy
