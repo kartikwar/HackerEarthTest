@@ -16,12 +16,17 @@ def map_varities(species, mapping_dict):
 	return species
 
 def save_dataframe_to_csv(dataframe, csv_file):
-	dataframe.to_csv(csv_file, index=False)
+	dataframe.to_csv(csv_file)
 
 def visualize_data(df):
 	# print list(df['currency'].unique())
-	df =  df[['deadline']]
-	save_dataframe_to_csv(df, 'output.csv')	
+	# df =  df[['backers_count']]
+	df = df.copy()
+	df = df.apply(preprocessing.LabelEncoder().fit_transform)
+	corr = df.corr(method='pearson')
+	corr = corr[['final_status']]
+	# print corr
+	save_dataframe_to_csv(corr, 'output.csv')	
 	# print df.describe()
 
 def convert_currency_to_us(ele):
@@ -29,7 +34,14 @@ def convert_currency_to_us(ele):
 		'AUD' : 1.29, 'NZD' : 1.38, 'EUR' : 0.81, 'SEK' : 8.26, 'NOK' : 7.83, 'DKK' : 6.05}
 	return currency_conversion[ele]
 
+def get_length(ele):
+	try:
+		return len(ele)
+	except:
+		return 0		
+
 def preprocess_data(dataset):
+	# print dataset['desc'].head()
 	# convert all goal prices to USD for comparision
 	dataset['currency'] = dataset['currency'].apply(convert_currency_to_us)
 	dataset['price'] = dataset['goal'] * dataset['currency']
@@ -39,20 +51,34 @@ def preprocess_data(dataset):
 	dataset['dead_launch'] = dataset['deadline'] - dataset['launched_at']
 	dataset['launch_create'] = dataset['launched_at'] - dataset['created_at']
 
+	#get the length of description
+	desc_length = dataset['desc'].apply(get_length)
+	name_length = dataset['name'].apply(get_length)
+	# dataset['keywords_length'] = dataset['keywords'].apply(get_length)
+	dataset['length'] = desc_length + name_length
+	# dataset['keywords_length'] = dataset.apply(get_length)
+
 	# remove unnecessary features
 	columns = list(dataset.columns)
 	remove_columns = ['project_id', 'name', 'desc', 'state_changed_at', 'currency', 'goal', 
 		'created_at', 'launched_at', 'deadline']
 	columns = [col for col in columns if col not in remove_columns]
 	print columns
-	# dataset = dataset[columns]
+	dataset = dataset[columns]
 	return dataset	
 
 def train_data(dataset):
+	#visualize coorelation after preprocessing
+	dataset = dataset.apply(preprocessing.LabelEncoder().fit_transform)
+	corr = dataset.corr(method='pearson')
+	corr = corr[['final_status']]
+	save_dataframe_to_csv(corr, 'output2.csv')
+
 	y = dataset["final_status"]
 	X = dataset.drop('final_status', axis=1)
-	X = X.apply(preprocessing.LabelEncoder().fit_transform)
+
 	X = StandardScaler().fit_transform(X)
+
 	# print X.head()
 	X_train , X_test, y_train , y_test = train_test_split(X, y, random_state=0)
 	rcf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
