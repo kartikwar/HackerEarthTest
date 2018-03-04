@@ -109,7 +109,7 @@ def get_oof(clf, x_train, y_train, x_test):
 	oof_train = np.zeros((ntrain,))
 	oof_test = np.zeros((ntest,))
 	SEED = 0 # for reproducibility
-	NFOLDS = 5 # set folds for out-of-fold prediction
+	NFOLDS = 10 # set folds for out-of-fold prediction
 	kf = KFold(len(x_train), n_folds= NFOLDS, random_state=SEED)
 	kf = list(kf)
 	oof_test_skf = np.empty((NFOLDS, ntest))
