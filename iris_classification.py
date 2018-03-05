@@ -20,7 +20,7 @@ def map_varities(species, mapping_dict):
 	return species
 
 def save_dataframe_to_csv(dataframe, csv_file):
-	dataframe.to_csv(csv_file)
+	dataframe.to_csv(csv_file, index=False)
 
 def visualize_data(df):
 	# print list(df['currency'].unique())
@@ -35,7 +35,9 @@ def visualize_data(df):
 
 def convert_currency_to_us(ele):
 	currency_conversion = {'USD' : 1.0, 'GBP' : 0.73, 'CAD' : 1.29, 
-		'AUD' : 1.29, 'NZD' : 1.38, 'EUR' : 0.81, 'SEK' : 8.26, 'NOK' : 7.83, 'DKK' : 6.05}
+		'AUD' : 1.29, 'NZD' : 1.38, 'EUR' : 0.81, 'SEK' : 8.26, 
+		'NOK' : 7.83, 'DKK' : 6.05, 'CHF' : 1.07, 'HKD' : 0.13, 
+		'SGD' : 0.76, 'MXN' : 0.053}
 	return currency_conversion[ele]
 
 def get_length(ele):
@@ -44,32 +46,39 @@ def get_length(ele):
 	except:
 		return 0		
 
-def preprocess_data(dataset):
+def preprocess_data(train, test):
 	# print dataset['desc'].head()
-	# convert all goal prices to USD for comparision
-	dataset['currency'] = dataset['currency'].apply(convert_currency_to_us)
-	dataset['price'] = dataset['goal'] * dataset['currency']
 	
-	#get the difference between important dates
-	dataset['dead_create'] = dataset['deadline'] - dataset['created_at']
-	dataset['dead_launch'] = dataset['deadline'] - dataset['launched_at']
-	dataset['launch_create'] = dataset['launched_at'] - dataset['created_at']
+	datasets = [train, test.copy()]
+	preprocessed_datasets = []
 
-	#get the length of description
-	desc_length = dataset['desc'].apply(get_length)
-	name_length = dataset['name'].apply(get_length)
-	# dataset['keywords_length'] = dataset['keywords'].apply(get_length)
-	dataset['length'] = desc_length + name_length
-	# dataset['keywords_length'] = dataset.apply(get_length)
+	for dataset in datasets:
+		# convert all goal prices to USD for comparision  
+		dataset['currency'] = dataset['currency'].apply(convert_currency_to_us)
+		dataset['price'] = dataset['goal'] * dataset['currency']
+		
+		#get the difference between important dates
+		dataset['dead_create'] = dataset['deadline'] - dataset['created_at']
+		dataset['dead_launch'] = dataset['deadline'] - dataset['launched_at']
+		dataset['launch_create'] = dataset['launched_at'] - dataset['created_at']
 
-	# remove unnecessary features
-	columns = list(dataset.columns)
-	remove_columns = ['project_id', 'name', 'desc', 'state_changed_at', 'currency', 'goal', 
-		'created_at', 'launched_at', 'deadline']
-	columns = [col for col in columns if col not in remove_columns]
-	print columns
-	dataset = dataset[columns]
-	return dataset	
+		#get the length of description
+		desc_length = dataset['desc'].apply(get_length)
+		name_length = dataset['name'].apply(get_length)
+		# dataset['keywords_length'] = dataset['keywords'].apply(get_length)
+		dataset['length'] = desc_length + name_length
+		# dataset['keywords_length'] = dataset.apply(get_length)
+
+		# remove unnecessary features
+		columns = list(dataset.columns)
+		remove_columns = ['project_id', 'name', 'desc', 'state_changed_at', 'currency', 'goal', 
+			'created_at', 'launched_at', 'deadline', 'backers_count']
+		columns = [col for col in columns if col not in remove_columns]
+		print columns
+		dataset = dataset[columns]
+		preprocessed_datasets.append(dataset)
+
+	return preprocessed_datasets[0], preprocessed_datasets[1]	
 
 def train_model_in_folds(counter_kf_ele, x_train, y_train, x_test, oof_train, oof_test_skf, clf):
 
@@ -106,11 +115,16 @@ def get_oof(clf, x_train, y_train, x_test):
 		oof_test[:] = oof_test_skf.mean(axis=0)	
 		return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1)
 
-def first_level_training(dataset):
+def first_level_training(dataset, test):
 	#visualize coorelation after preprocessing
 	dataset = dataset.apply(preprocessing.LabelEncoder().fit_transform)
-	total_features = len(list(dataset.columns))
+	test = test.apply(preprocessing.LabelEncoder().fit_transform)
+	total_features = (list(dataset.columns))
+	total_test_features = (list(test.columns))
+
 	print total_features
+	print total_test_features
+
 	corr = dataset.corr(method='pearson')
 	corr = corr[['final_status']]
 	save_dataframe_to_csv(corr, 'output2.csv')
@@ -119,16 +133,16 @@ def first_level_training(dataset):
 	X = dataset.drop('final_status', axis=1)
 
 	X = StandardScaler().fit_transform(X)
-
+	test = StandardScaler().fit_transform(test)
 	# print X.head()
-	X_train , X_test, y_train , y_test = train_test_split(X, y, random_state=0)
+	# X_train , X_test, y_train , y_test = train_test_split(X, y, random_state=0)
 
 	# classifier = RandomForestClassifier(random_state=0, n_estimators=500,max_features='sqrt', n_jobs=-1).fit(X_train, y_train)
 	# classifier = SVC(kernel='rbf', C=0.025, random_state=0, gamma='auto').fit(X_train, y_train)
 	# classifier = KNeighborsClassifier(n_neighbors=1).fit(X_train, y_train)
 	classifier = MLPClassifier(solver='sgd', alpha=1e-5,
-		hidden_layer_sizes=(100,), random_state=1, learning_rate='adaptive', tol=1e-4).fit(X_train, y_train)
-	return classifier, X_train, X_test, y_train, y_test
+		hidden_layer_sizes=(100,), random_state=1, learning_rate='adaptive', tol=1e-4).fit(X, y)
+	return classifier, test
 
 def calculate_accuracy(predicted, true):
 	accuracy = accuracy_score(true, predicted)
@@ -146,14 +160,16 @@ def second_level_training(X_train, y_train):
 
 if __name__ == '__main__':
 	dataset = pd.read_csv('train.csv')
+	test_dataset = pd.read_csv('test.csv')
 	visualize_data(dataset)
-	dataset = preprocess_data(dataset)
-	# print dataset.head()
+	dataset, test = preprocess_data(dataset, test_dataset)
+	print test.head()
 	# dataset = preprocess_data(dataset)
-	classifier, X_train, X_test, y_train, y_test = first_level_training(dataset)
+	classifier, test = first_level_training(dataset, test)
 	# clf = second_level_training(X_train, y_train)
-	predictions = classifier.predict(X_test)
+	predictions = classifier.predict(test)
 	print 'predictions are ', predictions
+	test_dataset['predictions'] = predictions
+	save_dataframe_to_csv(test_dataset[['project_id', 'predictions']], 'submission.csv')
+
 	# X_test_predict = predict_test(classifier, X_test)
-	test_accuracy = calculate_accuracy(predictions, y_test)
-	print test_accuracy
