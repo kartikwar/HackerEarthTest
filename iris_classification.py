@@ -10,9 +10,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
 
 
 def map_varities(species, mapping_dict):
@@ -118,13 +115,6 @@ def get_oof(clf, x_train, y_train, x_test):
 def first_level_training(dataset, test):
 	#visualize coorelation after preprocessing
 	dataset = dataset.apply(preprocessing.LabelEncoder().fit_transform)
-	test = test.apply(preprocessing.LabelEncoder().fit_transform)
-	total_features = (list(dataset.columns))
-	total_test_features = (list(test.columns))
-
-	print total_features
-	print total_test_features
-
 	corr = dataset.corr(method='pearson')
 	corr = corr[['final_status']]
 	save_dataframe_to_csv(corr, 'output2.csv')
