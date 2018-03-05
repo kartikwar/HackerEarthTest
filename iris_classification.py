@@ -169,7 +169,7 @@ if __name__ == '__main__':
 	# clf = second_level_training(X_train, y_train)
 	predictions = classifier.predict(test)
 	print 'predictions are ', predictions
-	test_dataset['predictions'] = predictions
-	save_dataframe_to_csv(test_dataset[['project_id', 'predictions']], 'submission.csv')
+	test_dataset['final_status'] = predictions
+	save_dataframe_to_csv(test_dataset[['project_id', 'final_status']], 'submission.csv')
 
 	# X_test_predict = predict_test(classifier, X_test)
