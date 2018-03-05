@@ -10,6 +10,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
 
 
 def map_varities(species, mapping_dict):
@@ -106,6 +109,8 @@ def get_oof(clf, x_train, y_train, x_test):
 def first_level_training(dataset):
 	#visualize coorelation after preprocessing
 	dataset = dataset.apply(preprocessing.LabelEncoder().fit_transform)
+	total_features = len(list(dataset.columns))
+	print total_features
 	corr = dataset.corr(method='pearson')
 	corr = corr[['final_status']]
 	save_dataframe_to_csv(corr, 'output2.csv')
@@ -118,8 +123,12 @@ def first_level_training(dataset):
 	# print X.head()
 	X_train , X_test, y_train , y_test = train_test_split(X, y, random_state=0)
 
-	rcf = RandomForestClassifier(random_state=0).fit(X_train, y_train)
-	return rcf, X_train, X_test, y_train, y_test
+	# classifier = RandomForestClassifier(random_state=0, n_estimators=500,max_features='sqrt', n_jobs=-1).fit(X_train, y_train)
+	# classifier = SVC(kernel='rbf', C=0.025, random_state=0, gamma='auto').fit(X_train, y_train)
+	# classifier = KNeighborsClassifier(n_neighbors=1).fit(X_train, y_train)
+	classifier = MLPClassifier(solver='sgd', alpha=1e-5,
+		hidden_layer_sizes=(100,), random_state=1, learning_rate='adaptive', tol=1e-4).fit(X_train, y_train)
+	return classifier, X_train, X_test, y_train, y_test
 
 def calculate_accuracy(predicted, true):
 	accuracy = accuracy_score(true, predicted)
